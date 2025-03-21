@@ -1,14 +1,20 @@
 //
-//  TomTimerWatchApp.swift
-//  TomTimerWatch Watch App
+//  WristApp.swift
+//  Wrist Watch App
 //
-//  Created by Tom on 2025/03/21.
+//  Created by Tom on 2025/03/18.
+//  Copyright © 2025 I. All rights reserved.
 //
 
 import SwiftUI
 
 @main
-struct TomTimerWatch_Watch_AppApp: App {
+struct TomTimerWatchApp: App {
+    
+    init() {
+            WatchConnectivityManager.shared.setupSession()
+        }
+    
     var body: some Scene {
         WindowGroup {
             ContentView()

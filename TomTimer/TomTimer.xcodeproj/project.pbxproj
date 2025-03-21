@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		E578ED0D2D8D38060067C227 /* TomTimerWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = E578ECEA2D8D38050067C227 /* TomTimerWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		E578ED202D8D3B700067C227 /* WatchConnectivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E578ED1F2D8D3A490067C227 /* WatchConnectivityManager.swift */; };
+		E578ED212D8D3B700067C227 /* WatchConnectivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E578ED1F2D8D3A490067C227 /* WatchConnectivityManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -69,6 +71,7 @@
 		E578ECEA2D8D38050067C227 /* TomTimerWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "TomTimerWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		E578ECF92D8D38060067C227 /* TomTimerWatch Watch AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "TomTimerWatch Watch AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		E578ED032D8D38060067C227 /* TomTimerWatch Watch AppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "TomTimerWatch Watch AppUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		E578ED1F2D8D3A490067C227 /* WatchConnectivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchConnectivityManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -166,6 +169,7 @@
 		E578ECAB2D8D36C70067C227 = {
 			isa = PBXGroup;
 			children = (
+				E578ED1E2D8D3A3E0067C227 /* Shared */,
 				E578ECB62D8D36C70067C227 /* TomTimer */,
 				E578ECCB2D8D36C80067C227 /* TomTimerTests */,
 				E578ECD52D8D36C80067C227 /* TomTimerUITests */,
@@ -187,6 +191,14 @@
 				E578ED032D8D38060067C227 /* TomTimerWatch Watch AppUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		E578ED1E2D8D3A3E0067C227 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				E578ED1F2D8D3A490067C227 /* WatchConnectivityManager.swift */,
+			);
+			path = Shared;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -438,6 +450,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E578ED202D8D3B700067C227 /* WatchConnectivityManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -459,6 +472,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E578ED212D8D3B700067C227 /* WatchConnectivityManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
