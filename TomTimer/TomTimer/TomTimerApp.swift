@@ -42,7 +42,7 @@ struct TomTimerApp: App {
     }
     
     var sharedModelContainer: ModelContainer = {
-            let schema = Schema([TomTimerSession.self])
+            let schema = Schema([TomTimerSession.self, TodoItem.self])
             let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
             
             do {
@@ -57,5 +57,6 @@ struct TomTimerApp: App {
         WindowGroup {
             ContentView()
         }
+        .modelContainer(sharedModelContainer)
     }
 }

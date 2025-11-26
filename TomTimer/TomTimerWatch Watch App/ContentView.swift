@@ -10,15 +10,17 @@ import SwiftUI
 import WatchConnectivity
 
 struct ContentView: View {
-    @AppStorage("pomodoroDuration") private var pomodoroDuration = 1500
     @State private var timeRemaining = 1500
     @State private var timerActive = false
     @State private var timer: Timer?
+    @State private var currentTaskTitle = "No Task Selected"
 
     var body: some View {
-        
-        
         VStack {
+            Text(currentTaskTitle)
+                .font(.headline)
+                .multilineTextAlignment(.center)
+                .padding(.bottom, 4)
             
             Text(formatTime(timeRemaining)).font(.system(size: 40))
             
@@ -41,6 +43,11 @@ struct ContentView: View {
             NotificationCenter.default.addObserver(forName: .timerUpdated, object: nil, queue: .main) { notification in
                 if let newTime = notification.object as? Int {
                     timeRemaining = newTime
+                }
+            }
+            NotificationCenter.default.addObserver(forName: .activeTaskUpdated, object: nil, queue: .main) { notification in
+                if let title = notification.object as? String {
+                    currentTaskTitle = title
                 }
             }
             WatchConnectivityManager.shared.setupSession()
