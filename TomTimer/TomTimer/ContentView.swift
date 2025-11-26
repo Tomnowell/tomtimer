@@ -21,9 +21,13 @@ struct ContentView: View {
     @State private var taskToEdit: TodoItem?
     @State private var activeTaskTitle: String?
     @State private var sessionDuration: Int?
+    @State private var syncConflicts: [SyncConflict] = []
+    @State private var showingConflictResolver = false
+    @State private var isSyncing = false
 
     @Environment(\.modelContext) private var context
     @Query(sort: \TodoItem.createdAt) private var tasks: [TodoItem]
+    @StateObject private var remindersManager = RemindersManager.shared
 
     var body: some View {
         NavigationStack {
@@ -44,8 +48,15 @@ struct ContentView: View {
             .padding()
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showingNewTaskSheet = true }) {
-                        Label("Add Task", systemImage: "plus")
+                    HStack(spacing: 12) {
+                        Button(action: { performSync() }) {
+                            Label("Sync", systemImage: isSyncing ? "arrow.triangle.2.circlepath" : "arrow.triangle.2.circlepath")
+                        }
+                        .disabled(isSyncing || remindersManager.selectedList == nil)
+
+                        Button(action: { showingNewTaskSheet = true }) {
+                            Label("Add Task", systemImage: "plus")
+                        }
                     }
                 }
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -65,6 +76,13 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showingNewTaskSheet) {
             taskEditor
+        }
+        .sheet(isPresented: $showingConflictResolver) {
+            ConflictResolverView(conflicts: $syncConflicts, remindersManager: remindersManager, tasks: tasks)
+        }
+        .onChange(of: remindersManager.selectedListIdentifier) { _, newValue in
+            guard newValue != nil else { return }
+            performSync()
         }
     }
 
@@ -376,6 +394,39 @@ struct ContentView: View {
             try context.save()
         } catch {
             print("Failed to save tasks: \(error.localizedDescription)")
+        }
+    }
+
+    private func performSync() {
+        guard remindersManager.authorizationStatus == .fullAccess ||
+              remindersManager.authorizationStatus == .writeOnly,
+              remindersManager.selectedList != nil else {
+            return
+        }
+
+        isSyncing = true
+        Task {
+            defer { isSyncing = false }
+
+            let conflicts = await remindersManager.syncFromReminders(to: context, tasks: tasks)
+            if !conflicts.isEmpty {
+                syncConflicts = conflicts
+                showingConflictResolver = true
+            }
+
+            for task in tasks {
+                do {
+                    try await remindersManager.createOrUpdateReminder(for: task)
+                } catch {
+                    print("Error syncing task to reminder: \(error.localizedDescription)")
+                }
+            }
+
+            do {
+                try context.save()
+            } catch {
+                print("Failed to save context after sync: \(error.localizedDescription)")
+            }
         }
     }
 }

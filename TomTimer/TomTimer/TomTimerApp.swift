@@ -1,6 +1,6 @@
 //
-//  PomodoroApp.swift
-//  Pomodoro
+//  TomTimerApp.swift
+//  TomTimer
 //
 //  Created by Tom on 2025/03/13.
 //
@@ -15,7 +15,6 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         return true
     }
 
-    // Allow notifications to display in foreground
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 willPresent notification: UNNotification,
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
@@ -26,12 +25,9 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 @main
 struct TomTimerApp: App {
     
-    // Corrected initializer
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    
     init() {
-        
-        // Register app delegate for notification delegate
-            @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-        
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { success, error in
             if success {
                 print("Notifications allowed!")
@@ -42,16 +38,44 @@ struct TomTimerApp: App {
     }
     
     var sharedModelContainer: ModelContainer = {
-            let schema = Schema([TomTimerSession.self, TodoItem.self])
-            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let schema = Schema([TomTimerSession.self, TodoItem.self])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        
+        do {
+            print("Creating ModelContainer")
+            return try ModelContainer(for: schema, configurations: config)
+        } catch {
+            print("ModelContainer creation failed: \(error)")
+            print("Attempting to delete old store and recreate...")
             
+            // Delete old stores
+            if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+                let storeURL = appSupport.appendingPathComponent("default.store")
+                try? FileManager.default.removeItem(at: storeURL)
+                
+                let storeURLShm = appSupport.appendingPathComponent("default.store-shm")
+                try? FileManager.default.removeItem(at: storeURLShm)
+                
+                let storeURLWal = appSupport.appendingPathComponent("default.store-wal")
+                try? FileManager.default.removeItem(at: storeURLWal)
+                
+                print("Deleted old store files")
+            }
+            
+            // Try creating with in-memory fallback
             do {
-                print("Creating ModelContainer")
                 return try ModelContainer(for: schema, configurations: config)
             } catch {
-                fatalError("Failed to create ModelContainer: \(error)")
+                print("Still failed, using in-memory container: \(error)")
+                let memoryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+                do {
+                    return try ModelContainer(for: schema, configurations: memoryConfig)
+                } catch {
+                    fatalError("Cannot create ModelContainer even in-memory: \(error)")
+                }
             }
-        }()
+        }
+    }()
 
     var body: some Scene {
         WindowGroup {
