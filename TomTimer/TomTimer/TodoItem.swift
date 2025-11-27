@@ -13,17 +13,15 @@ final class TodoItem {
     var estimatedMinutes: Int
     var remainingMinutes: Int
     var isActive: Bool
-    var createdAt: Date
-    var modifiedAt: Date = Date()
+    var modifiedAt: Date
     var reminderIdentifier: String? = nil
 
-    init(title: String, estimatedMinutes: Int, isActive: Bool = false, createdAt: Date = Date(), reminderIdentifier: String? = nil) {
+    init(title: String, estimatedMinutes: Int, isActive: Bool = false, reminderIdentifier: String? = nil) {
         self.title = title
         self.estimatedMinutes = max(0, estimatedMinutes)
         self.remainingMinutes = max(0, estimatedMinutes)
         self.isActive = isActive
-        self.createdAt = createdAt
-        self.modifiedAt = createdAt
+        self.modifiedAt = Date()
         self.reminderIdentifier = reminderIdentifier
     }
 

@@ -29,7 +29,7 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     @Environment(\.modelContext) private var context
-    @Query(sort: \TodoItem.createdAt) private var tasks: [TodoItem]
+    @Query(sort: \TodoItem.modifiedAt) private var tasks: [TodoItem]
     @StateObject private var remindersManager = RemindersManager.shared
 
     var body: some View {

@@ -13,12 +13,7 @@ import SwiftData
 final class RemindersManager: ObservableObject {
     private static let selectedListDefaultsKey = "selectedRemindersList"
     private let defaultEstimateMinutes = 25
-    private let metadataHeader = "TOMTIMER_DATA"
-    private lazy var iso8601Formatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
+    private let friendlyHeader = "TicketyPom Task"
     static let shared = RemindersManager()
 
     private let eventStore = EKEventStore()
@@ -84,73 +79,49 @@ final class RemindersManager: ObservableObject {
 
     // MARK: - Metadata
 
-    private struct ReminderMetadata: Codable {
+    struct ReminderMetadata: Codable, Equatable {
         var estimatedMinutes: Int
         var remainingMinutes: Int
-        var modifiedAt: Date
         var isActive: Bool
     }
 
-    private func encodeMetadata(for task: TodoItem) -> String {
+    func encodeMetadata(for task: TodoItem) -> String {
         [
-            metadataHeader,
-            "estimatedMinutes:\(task.estimatedMinutes)",
-            "remainingMinutes:\(task.remainingMinutes)",
-            "modifiedAt:\(iso8601Formatter.string(from: task.modifiedAt))",
-            "isActive:\(task.isActive)"
+            friendlyHeader,
+            "Estimated Total Time: \(task.estimatedMinutes) minutes",
+            "Remaining Time: \(task.remainingMinutes) minutes",
+            "Active: \(task.isActive)"
         ].joined(separator: "\n")
     }
 
-    private func decodeMetadata(from notes: String?) -> ReminderMetadata? {
-        guard let notes,
-              let headerRange = notes.range(of: metadataHeader) else {
-            return nil
-        }
-
-        var payload = notes[headerRange.upperBound...]
-        if payload.first == ":" {
-            payload = payload.dropFirst()
-        }
-        let trimmed = payload.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if trimmed.hasPrefix("{") {
-            if let data = trimmed.data(using: .utf8),
-               let legacyMetadata = try? JSONDecoder().decode(ReminderMetadata.self, from: data) {
-                return legacyMetadata
-            }
+    private func reminderMetadata(for reminder: EKReminder) -> ReminderMetadata {
+        guard let notes = reminder.notes else {
+            return ReminderMetadata(
+                estimatedMinutes: defaultEstimateMinutes,
+                remainingMinutes: defaultEstimateMinutes,
+                isActive: false
+            )
         }
 
         var estimated = defaultEstimateMinutes
         var remaining = defaultEstimateMinutes
-        var modified = Date()
-        var isActive = false
+        var active = false
 
-        for line in trimmed.split(separator: "\n") {
-            let parts = line.split(separator: ":", maxSplits: 1).map { String($0) }
-            guard parts.count == 2 else { continue }
-            let key = parts[0].trimmingCharacters(in: .whitespaces)
-            let value = parts[1].trimmingCharacters(in: .whitespaces)
-            switch key {
-            case "estimatedMinutes":
-                estimated = Int(value) ?? estimated
-            case "remainingMinutes":
-                remaining = Int(value) ?? remaining
-            case "modifiedAt":
-                if let date = iso8601Formatter.date(from: value) {
-                    modified = date
-                }
-            case "isActive":
-                isActive = Bool(value) ?? isActive
-            default:
-                break
+        for line in notes.split(separator: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("Estimated Total Time:") {
+                estimated = Int(trimmed.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) ?? estimated
+            } else if trimmed.hasPrefix("Remaining Time:") {
+                remaining = Int(trimmed.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) ?? remaining
+            } else if trimmed.hasPrefix("Active:") {
+                active = Bool(trimmed.split(separator: ":").last?.trimmingCharacters(in: .whitespaces) ?? "false") ?? active
             }
         }
 
         return ReminderMetadata(
             estimatedMinutes: estimated,
             remainingMinutes: remaining,
-            modifiedAt: modified,
-            isActive: isActive
+            isActive: active
         )
     }
 
@@ -210,22 +181,20 @@ final class RemindersManager: ObservableObject {
 
             if let existing = tasks.first(where: { $0.reminderIdentifier == reminderID }) {
                 processedIdentifiers.insert(reminderID)
-                if existing.modifiedAt > metadata.modifiedAt {
-                    if reminder.title != existing.title ||
-                        metadata.estimatedMinutes != existing.estimatedMinutes ||
-                        metadata.remainingMinutes != existing.remainingMinutes {
-                        conflicts.append(SyncConflict(
-                            task: existing,
-                            reminder: reminder,
-                            reminderId: reminderID,
-                            localTitle: existing.title,
-                            remoteTitle: reminder.title ?? "",
-                            localEstimate: existing.estimatedMinutes,
-                            remoteEstimate: metadata.estimatedMinutes,
-                            localRemaining: existing.remainingMinutes,
-                            remoteRemaining: metadata.remainingMinutes
-                        ))
-                    }
+                if reminder.title != existing.title ||
+                    metadata.estimatedMinutes != existing.estimatedMinutes ||
+                    metadata.remainingMinutes != existing.remainingMinutes {
+                    conflicts.append(SyncConflict(
+                        task: existing,
+                        reminder: reminder,
+                        reminderId: reminderID,
+                        localTitle: existing.title,
+                        remoteTitle: reminder.title ?? "",
+                        localEstimate: existing.estimatedMinutes,
+                        remoteEstimate: metadata.estimatedMinutes,
+                        localRemaining: existing.remainingMinutes,
+                        remoteRemaining: metadata.remainingMinutes
+                    ))
                 } else {
                     updateTask(existing, with: reminder, metadata: metadata)
                 }
@@ -234,17 +203,14 @@ final class RemindersManager: ObservableObject {
                     title: reminder.title ?? "Untitled",
                     estimatedMinutes: metadata.estimatedMinutes,
                     isActive: metadata.isActive,
-                    createdAt: reminder.creationDate ?? Date(),
                     reminderIdentifier: reminderID
                 )
                 newTask.remainingMinutes = metadata.remainingMinutes
-                newTask.modifiedAt = metadata.modifiedAt
                 context.insert(newTask)
                 processedIdentifiers.insert(reminderID)
             }
         }
 
-        // Remove tasks whose reminders aren't in the selected list anymore
         for task in tasks {
             guard let identifier = task.reminderIdentifier else { continue }
             if !processedIdentifiers.contains(identifier) {
@@ -260,28 +226,15 @@ final class RemindersManager: ObservableObject {
         task.estimatedMinutes = metadata.estimatedMinutes
         task.remainingMinutes = metadata.remainingMinutes
         task.isActive = metadata.isActive
-        task.modifiedAt = metadata.modifiedAt
     }
 
     func resolveConflict(_ conflict: SyncConflict, keepLocal: Bool, task: TodoItem, reminder: EKReminder) async throws {
         if keepLocal {
             try await createOrUpdateReminder(for: task)
-        } else if let metadata = decodeMetadata(from: reminder.notes) {
+        } else {
+            let metadata = reminderMetadata(for: reminder)
             updateTask(task, with: reminder, metadata: metadata)
         }
-    }
-
-    private func reminderMetadata(for reminder: EKReminder) -> ReminderMetadata {
-        if let decoded = decodeMetadata(from: reminder.notes) {
-            return decoded
-        }
-        let timestamp = reminder.lastModifiedDate ?? reminder.creationDate ?? Date()
-        return ReminderMetadata(
-            estimatedMinutes: defaultEstimateMinutes,
-            remainingMinutes: defaultEstimateMinutes,
-            modifiedAt: timestamp,
-            isActive: false
-        )
     }
 }
 
