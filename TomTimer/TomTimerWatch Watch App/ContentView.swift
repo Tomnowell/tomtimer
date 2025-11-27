@@ -48,20 +48,35 @@ struct ContentView: View {
             NotificationCenter.default.addObserver(forName: .activeTaskUpdated, object: nil, queue: .main) { notification in
                 if let title = notification.object as? String {
                     currentTaskTitle = title
+                } else {
+                    currentTaskTitle = "No Task Selected"
                 }
+            }
+            NotificationCenter.default.addObserver(forName: .timerStatusUpdated, object: nil, queue: .main) { notification in
+                guard let isRunning = notification.object as? Bool else { return }
+                handleRemoteTimerStatusChange(isRunning)
             }
             WatchConnectivityManager.shared.setupSession()
         }
     }
+
+    private func handleRemoteTimerStatusChange(_ isRunning: Bool) {
+        if !isRunning {
+            timer?.invalidate()
+            timer = nil
+        }
+        timerActive = isRunning
+    }
+
     func startTimer() {
         timerActive.toggle()
-        WatchConnectivityManager.shared.sendTimerUpdate(timeRemaining) // 🔹 Send to iPhone
+        WatchConnectivityManager.shared.sendTimerState(timeRemaining: timeRemaining, isRunning: timerActive)
 
         if timerActive {
             timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
                 if timeRemaining > 0 {
                     timeRemaining -= 1
-                    WatchConnectivityManager.shared.sendTimerUpdate(timeRemaining) // 🔹 Update iPhone in real-time
+                    WatchConnectivityManager.shared.sendTimerState(timeRemaining: timeRemaining, isRunning: true)
                 } else {
                     timerExpired()
                 }
@@ -75,13 +90,13 @@ struct ContentView: View {
         timer?.invalidate()
         timeRemaining = 1500
         timerActive = false
-        WatchConnectivityManager.shared.sendTimerUpdate(timeRemaining) // 🔹 Send reset to iPhone
+        WatchConnectivityManager.shared.sendTimerState(timeRemaining: timeRemaining, isRunning: false)
     }
 
     func timerExpired() {
         timer?.invalidate()
         timerActive = false
-        WatchConnectivityManager.shared.sendTimerUpdate(0) // 🔹 Notify iPhone of completion
+        WatchConnectivityManager.shared.sendTimerState(timeRemaining: 0, isRunning: false)
     }
 
     func formatTime(_ seconds: Int) -> String {

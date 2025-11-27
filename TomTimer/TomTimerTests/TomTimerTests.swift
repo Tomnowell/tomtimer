@@ -1,7 +1,6 @@
 import Testing
 import Foundation
 import EventKit
-@testable import TomTimer
 
 @MainActor
 struct TomTimerTests {
@@ -46,7 +45,7 @@ struct TomTimerTests {
         #expect(metadata.remainingMinutes == 5)
     }
 
-    private func decodeFriendlyMetadata(from reminder: EKReminder) -> RemindersManager.ReminderMetadata {
+    private func decodeFriendlyMetadata(from reminder: EKReminder) -> ReminderMetadata {
         guard let notes = reminder.notes else {
             return .init(
                 estimatedMinutes: 25,
@@ -76,4 +75,11 @@ struct TomTimerTests {
             isActive: active
         )
     }
+}
+
+// Simple metadata struct for test purposes
+struct ReminderMetadata {
+    let estimatedMinutes: Int
+    let remainingMinutes: Int
+    let isActive: Bool
 }

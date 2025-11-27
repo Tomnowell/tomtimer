@@ -46,6 +46,7 @@ struct ContentView: View {
                 }
 
                 timerControls
+                center
                 taskList
             }
             .padding()
@@ -78,7 +79,7 @@ struct ContentView: View {
                     sessionDuration = nil
                     timerEndDateTimestamp = 0
                     storedSessionDuration = 0
-                    WatchConnectivityManager.shared.sendTimerUpdate(newValue)
+                    syncTimerState(isRunning: false, seconds: newValue)
                 }
             }
         }
@@ -95,7 +96,7 @@ struct ContentView: View {
     }
 
     private var timerControls: some View {
-        VStack(spacing: 22) {
+        VStack(spacing: 12) {
             Button(action: { startTimer() }) {
                 Text(timerActive ? "Running" : "Start")
                     .frame(maxWidth: .infinity)
@@ -124,10 +125,16 @@ struct ContentView: View {
             }
         }
     }
+    
+    private var center: some View {
+        VStack () {
+            Text("Todo List:")
+        }
+    }
 
     private var taskList: some View {
         List {
-            Section("Todo List") {
+            Section() {
                 if tasks.isEmpty {
                     Text("Add a task to get started")
                         .foregroundColor(.secondary)
@@ -166,6 +173,17 @@ struct ContentView: View {
                                 Label("Edit", systemImage: "pencil")
                             }
                         }
+                    }
+                }
+                
+                // Add Task button row
+                Button(action: { showingNewTaskSheet = true }) {
+                    HStack {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundColor(.blue)
+                        Text("Add Task")
+                            .foregroundColor(.blue)
+                        Spacer()
                     }
                 }
             }
@@ -211,7 +229,7 @@ struct ContentView: View {
 
     private func bootstrapState() {
         timeRemaining = timerDuration
-        WatchConnectivityManager.shared.sendTimerUpdate(timeRemaining)
+        syncTimerState(isRunning: timerActive, seconds: timeRemaining)
         activeTaskTitle = activeTask?.title
         WatchConnectivityManager.shared.sendActiveTask(title: activeTaskTitle)
 
@@ -223,12 +241,30 @@ struct ContentView: View {
         NotificationCenter.default.addObserver(forName: .activeTaskUpdated, object: nil, queue: .main) { notification in
             activeTaskTitle = notification.object as? String
         }
+        NotificationCenter.default.addObserver(forName: .timerStatusUpdated, object: nil, queue: .main) { notification in
+            guard let isRunning = notification.object as? Bool else { return }
+            handleRemoteTimerStatusChange(isRunning)
+        }
     }
 
     private func formatTime(_ seconds: Int) -> String {
         let minutes = seconds / 60
         let secs = seconds % 60
         return String(format: "%02d:%02d", minutes, secs)
+    }
+
+    private func syncTimerState(isRunning: Bool? = nil, seconds: Int? = nil) {
+        let runningState = isRunning ?? timerActive
+        let remainingSeconds = seconds ?? timeRemaining
+        WatchConnectivityManager.shared.sendTimerState(timeRemaining: remainingSeconds, isRunning: runningState)
+    }
+
+    private func handleRemoteTimerStatusChange(_ isRunning: Bool) {
+        if !isRunning {
+            timer?.invalidate()
+            timer = nil
+        }
+        timerActive = isRunning
     }
 
     private func startTimer(resumingExisting: Bool = false) {
@@ -245,13 +281,13 @@ struct ContentView: View {
         storedSessionDuration = sessionDuration ?? timerDuration
         timer?.invalidate()
         timerActive = true
-        WatchConnectivityManager.shared.sendTimerUpdate(timeRemaining)
+        syncTimerState(isRunning: true)
         WatchConnectivityManager.shared.sendActiveTask(title: task.title)
 
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             if timeRemaining > 0 {
                 timeRemaining -= 1
-                WatchConnectivityManager.shared.sendTimerUpdate(timeRemaining)
+                syncTimerState(isRunning: true)
             } else {
                 timerExpired()
             }
@@ -266,7 +302,7 @@ struct ContentView: View {
         timerActive = false
         let elapsedSeconds = elapsedSecondsForCurrentSession() ?? sessionDuration ?? timerDuration
         notifyTimerFinished()
-        WatchConnectivityManager.shared.sendTimerUpdate(0)
+        syncTimerState(isRunning: false, seconds: 0)
         saveCompletedSession(duration: elapsedSeconds)
         applyCompletionToActiveTask(elapsedSeconds: elapsedSeconds)
         sessionDuration = nil
@@ -280,7 +316,7 @@ struct ContentView: View {
         timer = nil
         timerActive = false
         persistTimerState()
-        WatchConnectivityManager.shared.sendTimerUpdate(timeRemaining)
+        syncTimerState(isRunning: false)
     }
 
     private func resetTimer() {
@@ -294,7 +330,7 @@ struct ContentView: View {
         sessionDuration = nil
         storedSessionDuration = 0
         timerEndDateTimestamp = 0
-        WatchConnectivityManager.shared.sendTimerUpdate(timeRemaining)
+        syncTimerState(isRunning: false)
     }
 
     private func notifyTimerFinished() {
@@ -369,7 +405,7 @@ struct ContentView: View {
         storedSessionDuration = 0
         timerEndDateTimestamp = 0
         timeRemaining = timerDuration
-        WatchConnectivityManager.shared.sendTimerUpdate(timeRemaining)
+        syncTimerState(isRunning: false)
 
         // Toggle active flags
         for item in tasks {
@@ -491,6 +527,8 @@ struct ContentView: View {
                 storedSessionDuration = sessionDuration ?? 0
             }
         case .inactive:
+            break
+        default:
             break
         }
     }

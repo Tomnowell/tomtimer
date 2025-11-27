@@ -43,6 +43,17 @@ class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableObject {
         }
     }
 
+    func sendTimerState(timeRemaining: Int, isRunning: Bool) {
+        guard WCSession.default.isReachable else { return }
+        let payload: [String: Any] = [
+            "timeRemaining": timeRemaining,
+            "isTimerRunning": isRunning
+        ]
+        WCSession.default.sendMessage(payload, replyHandler: nil) { error in
+            print("Error sending timer update: \(error.localizedDescription)")
+        }
+    }
+
     func sendActiveTask(title: String?) {
         guard WCSession.default.isReachable else { return }
         let payload: [String: Any] = ["activeTaskTitle": title ?? ""]
@@ -55,6 +66,12 @@ class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableObject {
         if let newTime = message["timeRemaining"] as? Int {
             DispatchQueue.main.async {
                 NotificationCenter.default.post(name: .timerUpdated, object: newTime)
+            }
+        }
+
+        if let isRunning = message["isTimerRunning"] as? Bool {
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: .timerStatusUpdated, object: isRunning)
             }
         }
 
@@ -78,6 +95,7 @@ class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableObject {
 
 extension Notification.Name {
     static let timerUpdated = Notification.Name("timerUpdated")
+    static let timerStatusUpdated = Notification.Name("timerStatusUpdated")
     static let activeTaskUpdated = Notification.Name("activeTaskUpdated")
 }
 #endif
