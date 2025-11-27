@@ -25,12 +25,14 @@ struct ContentView: View {
     @State private var sessionDuration: Int?
     @State private var syncConflicts: [SyncConflict] = []
     @State private var showingConflictResolver = false
+    @State private var showingTimerCompleteAlert = false
     @State private var isSyncing = false
     @Environment(\.scenePhase) private var scenePhase
 
     @Environment(\.modelContext) private var context
     @Query(sort: \TodoItem.modifiedAt) private var tasks: [TodoItem]
     @StateObject private var remindersManager = RemindersManager.shared
+    @StateObject private var pluginManager = PluginManager.shared
 
     var body: some View {
         NavigationStack {
@@ -301,7 +303,17 @@ struct ContentView: View {
         timer = nil
         timerActive = false
         let elapsedSeconds = elapsedSecondsForCurrentSession() ?? sessionDuration ?? timerDuration
+        
+        // Trigger haptic feedback
+        let notificationFeedback = UINotificationFeedbackGenerator()
+        notificationFeedback.notificationOccurred(.success)
+        
+        // Show system notification
         notifyTimerFinished()
+        
+        // Show in-app alert
+        showingTimerCompleteAlert = true
+        
         syncTimerState(isRunning: false, seconds: 0)
         saveCompletedSession(duration: elapsedSeconds)
         applyCompletionToActiveTask(elapsedSeconds: elapsedSeconds)

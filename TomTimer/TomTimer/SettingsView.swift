@@ -13,12 +13,61 @@ struct SettingsView: View {
     @AppStorage("timerDuration") private var timerDuration = 1500  // Default 25 mins
     @StateObject private var remindersManager = RemindersManager.shared
     @State private var showingListPicker = false
+    
+    private var pluginManager: PluginManager { PluginManager.shared }
 
     var body: some View {
         Form {
             Section(header: Text("Timer Settings")) {
-                Stepper(value: $timerDuration, in: 300...3600, step: 60) {
+                Stepper(value: $timerDuration, in: 60...3600, step: 60) {
                     Text("Pomodoro Duration: \(timerDuration / 60) min")
+                }
+            }
+            
+            Section(header: Text("Integrations")) {
+                if pluginManager.availableProviders.isEmpty {
+                    Text("No integrations available")
+                        .foregroundColor(.secondary)
+                } else {
+                    ForEach(Array(pluginManager.availableProviders.enumerated()), id: \.offset) { index, provider in
+                        HStack {
+                            Image(systemName: provider.icon)
+                                .foregroundColor(.blue)
+                                .frame(width: 24)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(provider.displayName)
+                                    .font(.body)
+                                if !provider.isAuthenticated {
+                                    Text("Tap to configure")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            
+                            Spacer()
+                            
+                            if pluginManager.enabledProviders.contains(provider.identifier) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            Task {
+                                if !provider.isAuthenticated {
+                                    do {
+                                        try await provider.authenticate()
+                                        pluginManager.enableProvider(provider.identifier)
+                                    } catch {
+                                        print("Authentication failed: \(error)")
+                                    }
+                                } else {
+                                    pluginManager.toggleProvider(provider.identifier)
+                                }
+                            }
+                        }
+                    }
                 }
             }
             

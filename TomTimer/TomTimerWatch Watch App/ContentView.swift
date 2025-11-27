@@ -14,6 +14,7 @@ struct ContentView: View {
     @State private var timerActive = false
     @State private var timer: Timer?
     @State private var currentTaskTitle = "No Task Selected"
+    @State private var showingCompleteAlert = false
 
     var body: some View {
         VStack {
@@ -39,6 +40,11 @@ struct ContentView: View {
             }
         }
         .padding()
+        .alert("Pomodoro Complete! 🍅", isPresented: $showingCompleteAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Great work! Time for a break.")
+        }
         .onAppear {
             NotificationCenter.default.addObserver(forName: .timerUpdated, object: nil, queue: .main) { notification in
                 if let newTime = notification.object as? Int {
@@ -96,6 +102,13 @@ struct ContentView: View {
     func timerExpired() {
         timer?.invalidate()
         timerActive = false
+        
+        // Trigger haptic feedback on watch
+        WKInterfaceDevice.current().play(.notification)
+        
+        // Show alert
+        showingCompleteAlert = true
+        
         WatchConnectivityManager.shared.sendTimerState(timeRemaining: 0, isRunning: false)
     }
 
