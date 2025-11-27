@@ -12,6 +12,8 @@ import WatchConnectivity
 
 struct ContentView: View {
     @AppStorage("timerDuration") private var timerDuration = 1500
+    @AppStorage("timerEndDateTimestamp") private var timerEndDateTimestamp: Double = 0
+    @AppStorage("sessionDurationBackup") private var storedSessionDuration: Int = 0
     @State private var timeRemaining = 1500
     @State private var timerActive = false
     @State private var timer: Timer?
@@ -24,6 +26,7 @@ struct ContentView: View {
     @State private var syncConflicts: [SyncConflict] = []
     @State private var showingConflictResolver = false
     @State private var isSyncing = false
+    @Environment(\.scenePhase) private var scenePhase
 
     @Environment(\.modelContext) private var context
     @Query(sort: \TodoItem.createdAt) private var tasks: [TodoItem]
@@ -66,10 +69,15 @@ struct ContentView: View {
                 }
             }
             .onAppear(perform: bootstrapState)
+            .onChange(of: scenePhase) { _, phase in
+                handleScenePhaseChange(phase)
+            }
             .onChange(of: timerDuration) { oldValue, newValue in
                 if !timerActive {
                     timeRemaining = newValue
                     sessionDuration = nil
+                    timerEndDateTimestamp = 0
+                    storedSessionDuration = 0
                     WatchConnectivityManager.shared.sendTimerUpdate(newValue)
                 }
             }
@@ -88,7 +96,7 @@ struct ContentView: View {
 
     private var timerControls: some View {
         VStack(spacing: 22) {
-            Button(action: startTimer) {
+            Button(action: { startTimer() }) {
                 Text(timerActive ? "Running" : "Start")
                     .frame(maxWidth: .infinity)
                     .frame(height: 52)
@@ -223,11 +231,19 @@ struct ContentView: View {
         return String(format: "%02d:%02d", minutes, secs)
     }
 
-    private func startTimer() {
+    private func startTimer(resumingExisting: Bool = false) {
         guard let task = activeTask else { return }
-        if sessionDuration == nil {
+
+        if resumingExisting {
+            if sessionDuration == nil {
+                sessionDuration = storedSessionDuration > 0 ? storedSessionDuration : timerDuration
+            }
+        } else if sessionDuration == nil {
             sessionDuration = timeRemaining
         }
+
+        storedSessionDuration = sessionDuration ?? timerDuration
+        timer?.invalidate()
         timerActive = true
         WatchConnectivityManager.shared.sendTimerUpdate(timeRemaining)
         WatchConnectivityManager.shared.sendActiveTask(title: task.title)
@@ -240,19 +256,22 @@ struct ContentView: View {
                 timerExpired()
             }
         }
+
+        persistTimerState()
     }
 
     private func timerExpired() {
         timer?.invalidate()
         timer = nil
         timerActive = false
-        // Prefer measured elapsed; fall back to planned session duration; else current setting
         let elapsedSeconds = elapsedSecondsForCurrentSession() ?? sessionDuration ?? timerDuration
         notifyTimerFinished()
         WatchConnectivityManager.shared.sendTimerUpdate(0)
         saveCompletedSession(duration: elapsedSeconds)
         applyCompletionToActiveTask(elapsedSeconds: elapsedSeconds)
         sessionDuration = nil
+        storedSessionDuration = 0
+        timerEndDateTimestamp = 0
         timeRemaining = timerDuration
     }
 
@@ -260,11 +279,11 @@ struct ContentView: View {
         timer?.invalidate()
         timer = nil
         timerActive = false
+        persistTimerState()
         WatchConnectivityManager.shared.sendTimerUpdate(timeRemaining)
     }
 
     private func resetTimer() {
-        // Apply any elapsed time from the current session before resetting
         if let elapsed = elapsedSecondsForCurrentSession() {
             applyCompletionToActiveTask(elapsedSeconds: elapsed)
         }
@@ -273,6 +292,8 @@ struct ContentView: View {
         timerActive = false
         timeRemaining = timerDuration
         sessionDuration = nil
+        storedSessionDuration = 0
+        timerEndDateTimestamp = 0
         WatchConnectivityManager.shared.sendTimerUpdate(timeRemaining)
     }
 
@@ -345,6 +366,8 @@ struct ContentView: View {
         timer = nil
         timerActive = false
         sessionDuration = nil
+        storedSessionDuration = 0
+        timerEndDateTimestamp = 0
         timeRemaining = timerDuration
         WatchConnectivityManager.shared.sendTimerUpdate(timeRemaining)
 
@@ -397,6 +420,18 @@ struct ContentView: View {
         }
     }
 
+    private func persistTimerState() {
+        guard timerActive else { return }
+        let now = Date().timeIntervalSince1970
+        timerEndDateTimestamp = now + Double(timeRemaining)
+        storedSessionDuration = sessionDuration ?? timerDuration
+    }
+
+    private func clearTimerPersistence() {
+        timerEndDateTimestamp = 0
+        storedSessionDuration = 0
+    }
+
     private func performSync() {
         guard remindersManager.authorizationStatus == .fullAccess ||
               remindersManager.authorizationStatus == .writeOnly,
@@ -427,6 +462,36 @@ struct ContentView: View {
             } catch {
                 print("Failed to save context after sync: \(error.localizedDescription)")
             }
+        }
+    }
+
+    private func handleScenePhaseChange(_ phase: ScenePhase) {
+        switch phase {
+        case .active:
+            // Restore timer state if needed
+            if timerEndDateTimestamp > 0 {
+                let now = Date().timeIntervalSince1970
+                let remaining = timerEndDateTimestamp - now
+                if remaining > 0 {
+                    timeRemaining = Int(remaining)
+                    timerActive = true
+                    startTimer(resumingExisting: true)
+                } else {
+                    // Timer ended while in background
+                    timerActive = false
+                    timeRemaining = timerDuration
+                    sessionDuration = nil
+                }
+            }
+        case .background:
+            // Store timer end date and session duration
+            if timerActive {
+                let now = Date().timeIntervalSince1970
+                timerEndDateTimestamp = now + Double(timeRemaining)
+                storedSessionDuration = sessionDuration ?? 0
+            }
+        case .inactive:
+            break
         }
     }
 }

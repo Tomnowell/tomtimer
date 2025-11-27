@@ -13,6 +13,12 @@ import SwiftData
 final class RemindersManager: ObservableObject {
     private static let selectedListDefaultsKey = "selectedRemindersList"
     private let defaultEstimateMinutes = 25
+    private let metadataHeader = "TOMTIMER_DATA"
+    private lazy var iso8601Formatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
     static let shared = RemindersManager()
 
     private let eventStore = EKEventStore()
@@ -86,40 +92,65 @@ final class RemindersManager: ObservableObject {
     }
 
     private func encodeMetadata(for task: TodoItem) -> String {
-        let metadata = ReminderMetadata(
-            estimatedMinutes: task.estimatedMinutes,
-            remainingMinutes: task.remainingMinutes,
-            modifiedAt: task.modifiedAt,
-            isActive: task.isActive
-        )
-        guard let data = try? JSONEncoder().encode(metadata),
-              let json = String(data: data, encoding: .utf8) else {
-            return ""
-        }
-        return "TOMTIMER_DATA:\(json)"
+        [
+            metadataHeader,
+            "estimatedMinutes:\(task.estimatedMinutes)",
+            "remainingMinutes:\(task.remainingMinutes)",
+            "modifiedAt:\(iso8601Formatter.string(from: task.modifiedAt))",
+            "isActive:\(task.isActive)"
+        ].joined(separator: "\n")
     }
 
     private func decodeMetadata(from notes: String?) -> ReminderMetadata? {
         guard let notes,
-              let range = notes.range(of: "TOMTIMER_DATA:"),
-              let jsonStart = notes.index(range.upperBound, offsetBy: 0, limitedBy: notes.endIndex) else {
+              let headerRange = notes.range(of: metadataHeader) else {
             return nil
         }
-        let jsonString = String(notes[jsonStart...])
-        guard let data = jsonString.data(using: .utf8) else { return nil }
-        return try? JSONDecoder().decode(ReminderMetadata.self, from: data)
-    }
 
-    private func metadata(for reminder: EKReminder) -> ReminderMetadata {
-        if let decoded = decodeMetadata(from: reminder.notes) {
-            return decoded
+        var payload = notes[headerRange.upperBound...]
+        if payload.first == ":" {
+            payload = payload.dropFirst()
         }
-        let timestamp = reminder.lastModifiedDate ?? reminder.creationDate ?? Date()
+        let trimmed = payload.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if trimmed.hasPrefix("{") {
+            if let data = trimmed.data(using: .utf8),
+               let legacyMetadata = try? JSONDecoder().decode(ReminderMetadata.self, from: data) {
+                return legacyMetadata
+            }
+        }
+
+        var estimated = defaultEstimateMinutes
+        var remaining = defaultEstimateMinutes
+        var modified = Date()
+        var isActive = false
+
+        for line in trimmed.split(separator: "\n") {
+            let parts = line.split(separator: ":", maxSplits: 1).map { String($0) }
+            guard parts.count == 2 else { continue }
+            let key = parts[0].trimmingCharacters(in: .whitespaces)
+            let value = parts[1].trimmingCharacters(in: .whitespaces)
+            switch key {
+            case "estimatedMinutes":
+                estimated = Int(value) ?? estimated
+            case "remainingMinutes":
+                remaining = Int(value) ?? remaining
+            case "modifiedAt":
+                if let date = iso8601Formatter.date(from: value) {
+                    modified = date
+                }
+            case "isActive":
+                isActive = Bool(value) ?? isActive
+            default:
+                break
+            }
+        }
+
         return ReminderMetadata(
-            estimatedMinutes: defaultEstimateMinutes,
-            remainingMinutes: defaultEstimateMinutes,
-            modifiedAt: timestamp,
-            isActive: false
+            estimatedMinutes: estimated,
+            remainingMinutes: remaining,
+            modifiedAt: modified,
+            isActive: isActive
         )
     }
 
@@ -174,7 +205,7 @@ final class RemindersManager: ObservableObject {
         var processedIdentifiers = Set<String>()
 
         for reminder in reminders {
-            let metadata = metadata(for: reminder)
+            let metadata = reminderMetadata(for: reminder)
             let reminderID = reminder.calendarItemIdentifier
 
             if let existing = tasks.first(where: { $0.reminderIdentifier == reminderID }) {
@@ -238,6 +269,19 @@ final class RemindersManager: ObservableObject {
         } else if let metadata = decodeMetadata(from: reminder.notes) {
             updateTask(task, with: reminder, metadata: metadata)
         }
+    }
+
+    private func reminderMetadata(for reminder: EKReminder) -> ReminderMetadata {
+        if let decoded = decodeMetadata(from: reminder.notes) {
+            return decoded
+        }
+        let timestamp = reminder.lastModifiedDate ?? reminder.creationDate ?? Date()
+        return ReminderMetadata(
+            estimatedMinutes: defaultEstimateMinutes,
+            remainingMinutes: defaultEstimateMinutes,
+            modifiedAt: timestamp,
+            isActive: false
+        )
     }
 }
 

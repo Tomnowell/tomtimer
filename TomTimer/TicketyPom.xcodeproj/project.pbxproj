@@ -376,7 +376,7 @@
 					};
 				};
 			};
-			buildConfigurationList = E578ECAF2D8D36C70067C227 /* Build configuration list for PBXProject "TomTimer" */;
+			buildConfigurationList = E578ECAF2D8D36C70067C227 /* Build configuration list for PBXProject "TicketyPom" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -524,7 +524,7 @@
 		E578ECDC2D8D36C80067C227 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = TicketyPomiOSLogo;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = TomTimer/TomTimer.entitlements;
@@ -536,7 +536,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TomTimer/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Tomodoro;
+				INFOPLIST_KEY_CFBundleDisplayName = TicketyPom;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSRemindersUsageDescription = "TomTimer syncs your tasks with Apple Reminders to track pomodoro estimates and progress.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -568,7 +568,7 @@
 		E578ECDD2D8D36C80067C227 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = TicketyPomiOSLogo;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = TomTimer/TomTimer.entitlements;
@@ -580,7 +580,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TomTimer/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Tomodoro;
+				INFOPLIST_KEY_CFBundleDisplayName = TicketyPom;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSRemindersUsageDescription = "TomTimer syncs your tasks with Apple Reminders to track pomodoro estimates and progress.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -820,15 +820,16 @@
 		E578ED0F2D8D38060067C227 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = TicketyPomiOSLogo;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"TomTimerWatch Watch App/Preview Content\"";
 				DEVELOPMENT_TEAM = 62T943KY58;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = TomTimerWatch;
+				INFOPLIST_KEY_CFBundleDisplayName = TicketyPomWatch;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.tomnowell.TomTimer;
 				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
@@ -851,15 +852,16 @@
 		E578ED102D8D38060067C227 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = TicketyPomiOSLogo;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"TomTimerWatch Watch App/Preview Content\"";
 				DEVELOPMENT_TEAM = 62T943KY58;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = TomTimerWatch;
+				INFOPLIST_KEY_CFBundleDisplayName = TicketyPomWatch;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.tomnowell.TomTimer;
 				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
@@ -963,7 +965,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		E578ECAF2D8D36C70067C227 /* Build configuration list for PBXProject "TomTimer" */ = {
+		E578ECAF2D8D36C70067C227 /* Build configuration list for PBXProject "TicketyPom" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E578ECDE2D8D36C80067C227 /* Debug */,
