@@ -18,7 +18,7 @@ class RemindersTaskProvider: TaskProvider {
     let requiresAuthentication = true
     
     private let eventStore = EKEventStore()
-    private let friendlyHeader = "TicketyPom Task"
+    private let header = "TicketyPom Task"
     private let defaultEstimateMinutes = 25
     
     var selectedListIdentifier: String?
@@ -129,7 +129,7 @@ class RemindersTaskProvider: TaskProvider {
     
     private func encodeFriendlyMetadata(estimated: Int, remaining: Int, isActive: Bool) -> String {
         return [
-            friendlyHeader,
+            header,
             "Estimated Total Time: \(estimated) minutes",
             "Remaining Time: \(remaining) minutes",
             "Active: \(isActive)"

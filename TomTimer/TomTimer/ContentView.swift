@@ -27,18 +27,25 @@ struct ContentView: View {
     @State private var showingConflictResolver = false
     @State private var showingTimerCompleteAlert = false
     @State private var isSyncing = false
+    @State private var hasBootstrapped = false
+    @State private var lastScenePhase: ScenePhase? = nil
     @Environment(\.scenePhase) private var scenePhase
 
     @Environment(\.modelContext) private var context
     @Query(sort: \TodoItem.modifiedAt) private var tasks: [TodoItem]
     @StateObject private var remindersManager = RemindersManager.shared
     @StateObject private var pluginManager = PluginManager.shared
+    
+    let brown = Color(red: 122/255, green: 92/255, blue: 84/255)
+    let green = Color(red: 48/255, green: 250/255, blue: 116/255)
+    let orange = Color(red: 250/255, green: 88/255, blue: 57/255)
+    let pink = Color(red: 250/255, green: 47/255, blue: 151/255)
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 48) {
-                VStack(spacing: 80) {
-                    Text(activeTaskTitle ?? "Select a task")
+            VStack(spacing: 24) {
+                VStack(spacing: 12) {
+                    Text(activeTaskTitle ?? "No task selected")
                         .font(.headline)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: .infinity)
@@ -72,8 +79,8 @@ struct ContentView: View {
                 }
             }
             .onAppear(perform: bootstrapState)
-            .onChange(of: scenePhase) { _, phase in
-                handleScenePhaseChange(phase)
+            .onChange(of: scenePhase) { oldPhase, newPhase in
+                handleScenePhaseChange(from: oldPhase, to: newPhase)
             }
             .onChange(of: timerDuration) { oldValue, newValue in
                 if !timerActive {
@@ -91,20 +98,36 @@ struct ContentView: View {
         .sheet(isPresented: $showingConflictResolver) {
             ConflictResolverView(conflicts: $syncConflicts, remindersManager: remindersManager, tasks: tasks)
         }
+        .alert("Pomodoro Complete! 🍅", isPresented: $showingTimerCompleteAlert) {
+            Button("OK", role: .cancel) { }
+            Button("Start Another") {
+                if activeTask != nil {
+                    startTimer()
+                }
+            }
+        } message: {
+            if let taskTitle = activeTaskTitle {
+                Text("Great work on \(taskTitle)! Time for a break.")
+            } else {
+                Text("Great work! Time for a break.")
+            }
+        }
         .onChange(of: remindersManager.selectedListIdentifier) { _, newValue in
             guard newValue != nil else { return }
             performSync()
         }
     }
-
+    
+    
     private var timerControls: some View {
-        VStack(spacing: 12) {
+        
+        VStack(spacing: 24) {
             Button(action: { startTimer() }) {
                 Text(timerActive ? "Running" : "Start")
                     .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .background(timerActive ? Color.gray : Color.green)
-                    .foregroundColor(.white)
+                    .frame(height: 48)
+                    .background(timerActive ? brown: green)
+                    .foregroundColor(timerActive ? green: brown)
                     .cornerRadius(12)
             }
             .disabled(timerActive || activeTask == nil)
@@ -112,16 +135,16 @@ struct ContentView: View {
             HStack(spacing: 16) {
                 Button("Pause", action: pauseTimer)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-                    .background(Color.orange)
+                    .frame(height: 48)
+                    .background(pink)
                     .foregroundColor(.white)
                     .cornerRadius(12)
                     .disabled(!timerActive)
 
                 Button("Reset", action: resetTimer)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-                    .background(Color.red)
+                    .frame(height: 48)
+                    .background(orange)
                     .foregroundColor(.white)
                     .cornerRadius(12)
             }
@@ -138,7 +161,7 @@ struct ContentView: View {
         List {
             Section() {
                 if tasks.isEmpty {
-                    Text("Add a task to get started")
+                    Text("Add a task or start a timer with no task")
                         .foregroundColor(.secondary)
                 } else {
                     ForEach(tasks) { task in
@@ -158,7 +181,7 @@ struct ContentView: View {
                         }
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            select(task)
+                            toggleSelection(for: task)
                         }
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) {
@@ -198,7 +221,7 @@ struct ContentView: View {
             Form {
                 Section(header: Text("Task")) {
                     TextField("Title", text: $taskTitle)
-                    Stepper(value: $estimatedMinutesInput, in: 5...600, step: 5) {
+                    Stepper(value: $estimatedMinutesInput, in: 1...600, step: 1) {
                         Text("Estimated Minutes: \(estimatedMinutesInput)")
                     }
                 }
@@ -206,7 +229,7 @@ struct ContentView: View {
                     Section(header: Text("Adjust Remaining")) {
                         Stepper(value: Binding(get: { editing.remainingMinutes }, set: { newValue in
                             editing.remainingMinutes = newValue
-                        }), in: 0...editing.estimatedMinutes, step: 5) {
+                        }), in: 0...editing.estimatedMinutes, step: 1) {
                             Text("Remaining Minutes: \(editing.remainingMinutes)")
                         }
                     }
@@ -229,8 +252,30 @@ struct ContentView: View {
         tasks.first(where: { $0.isActive })
     }
 
+    private func toggleSelection(for task: TodoItem) {
+        if task.isActive {
+            // Deselect current task
+            task.isActive = false
+            activeTaskTitle = nil
+            WatchConnectivityManager.shared.sendActiveTask(title: nil)
+        } else {
+            select(task)
+        }
+    }
+
     private func bootstrapState() {
-        timeRemaining = timerDuration
+        // Ensure we only bootstrap once per ContentView lifecycle
+        guard !hasBootstrapped else { return }
+        hasBootstrapped = true
+
+        // Only set an initial time if there is no persisted session
+        if timerEndDateTimestamp == 0 && storedSessionDuration == 0 {
+            timeRemaining = timerDuration
+        } else {
+            // Try to restore existing timer immediately on launch
+            restoreTimerIfNeeded()
+        }
+
         syncTimerState(isRunning: timerActive, seconds: timeRemaining)
         activeTaskTitle = activeTask?.title
         WatchConnectivityManager.shared.sendActiveTask(title: activeTaskTitle)
@@ -246,6 +291,54 @@ struct ContentView: View {
         NotificationCenter.default.addObserver(forName: .timerStatusUpdated, object: nil, queue: .main) { notification in
             guard let isRunning = notification.object as? Bool else { return }
             handleRemoteTimerStatusChange(isRunning)
+        }
+    }
+
+    private func handleScenePhaseChange(from oldPhase: ScenePhase?, to newPhase: ScenePhase) {
+        lastScenePhase = newPhase
+        switch (oldPhase, newPhase) {
+        case (.inactive, .active), (.background, .active):
+            // Only attempt restore when coming back from inactive/background
+            restoreTimerIfNeeded()
+        case (_, .background):
+            // Persist timer state when going to background
+            persistTimerState()
+        default:
+            break
+        }
+    }
+
+    // Restore timer based on persisted end timestamp and stored session duration
+    private func restoreTimerIfNeeded() {
+        guard timerEndDateTimestamp > 0 else { return }
+
+        let now = Date().timeIntervalSince1970
+        let remaining = timerEndDateTimestamp - now
+
+        if remaining <= 0 {
+            // Timer expired while app was inactive – reset to default
+            timerActive = false
+            timeRemaining = timerDuration
+            sessionDuration = nil
+            clearTimerPersistence()
+            syncTimerState(isRunning: false, seconds: timeRemaining)
+            return
+        }
+
+        timeRemaining = Int(remaining)
+
+        if sessionDuration == nil {
+            if storedSessionDuration > 0 {
+                sessionDuration = storedSessionDuration
+            } else {
+                sessionDuration = timerDuration
+            }
+        }
+
+        // If we don't already have a timer running, start one in resume mode
+        if timer == nil {
+            timerActive = true
+            startTimer(resumingExisting: true)
         }
     }
 
@@ -348,7 +441,7 @@ struct ContentView: View {
     private func notifyTimerFinished() {
         let content = UNMutableNotificationContent()
         content.title = "🍅 Pomodoro Finished!"
-        content.body = activeTaskTitle.map { "\($0) updated." } ?? "Nice job! Time for a short break."
+        content.body = activeTaskTitle.map { "\($0) updated." } ?? "Nice job! Time for a break."
         content.sound = .default
 
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
@@ -510,38 +603,6 @@ struct ContentView: View {
             } catch {
                 print("Failed to save context after sync: \(error.localizedDescription)")
             }
-        }
-    }
-
-    private func handleScenePhaseChange(_ phase: ScenePhase) {
-        switch phase {
-        case .active:
-            // Restore timer state if needed
-            if timerEndDateTimestamp > 0 {
-                let now = Date().timeIntervalSince1970
-                let remaining = timerEndDateTimestamp - now
-                if remaining > 0 {
-                    timeRemaining = Int(remaining)
-                    timerActive = true
-                    startTimer(resumingExisting: true)
-                } else {
-                    // Timer ended while in background
-                    timerActive = false
-                    timeRemaining = timerDuration
-                    sessionDuration = nil
-                }
-            }
-        case .background:
-            // Store timer end date and session duration
-            if timerActive {
-                let now = Date().timeIntervalSince1970
-                timerEndDateTimestamp = now + Double(timeRemaining)
-                storedSessionDuration = sessionDuration ?? 0
-            }
-        case .inactive:
-            break
-        default:
-            break
         }
     }
 }
