@@ -29,6 +29,7 @@ struct ContentView: View {
     @State private var isSyncing = false
     @State private var hasBootstrapped = false
     @State private var lastScenePhase: ScenePhase? = nil
+    @State private var isTaskBoundSession = false
     @Environment(\.scenePhase) private var scenePhase
 
     @Environment(\.modelContext) private var context
@@ -130,7 +131,7 @@ struct ContentView: View {
                     .foregroundColor(timerActive ? green: brown)
                     .cornerRadius(12)
             }
-            .disabled(timerActive || activeTask == nil)
+            .disabled(timerActive)
 
             HStack(spacing: 16) {
                 Button("Pause", action: pauseTimer)
@@ -257,7 +258,9 @@ struct ContentView: View {
             // Deselect current task
             task.isActive = false
             activeTaskTitle = nil
+            isTaskBoundSession = false
             WatchConnectivityManager.shared.sendActiveTask(title: nil)
+            persistTasks()
         } else {
             select(task)
         }
@@ -321,6 +324,7 @@ struct ContentView: View {
             timeRemaining = timerDuration
             sessionDuration = nil
             clearTimerPersistence()
+            isTaskBoundSession = false
             syncTimerState(isRunning: false, seconds: timeRemaining)
             return
         }
@@ -363,7 +367,7 @@ struct ContentView: View {
     }
 
     private func startTimer(resumingExisting: Bool = false) {
-        guard let task = activeTask else { return }
+        let task = activeTask
 
         if resumingExisting {
             if sessionDuration == nil {
@@ -373,11 +377,12 @@ struct ContentView: View {
             sessionDuration = timeRemaining
         }
 
+        isTaskBoundSession = (task != nil)
         storedSessionDuration = sessionDuration ?? timerDuration
         timer?.invalidate()
         timerActive = true
         syncTimerState(isRunning: true)
-        WatchConnectivityManager.shared.sendActiveTask(title: task.title)
+        WatchConnectivityManager.shared.sendActiveTask(title: task?.title)
 
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             if timeRemaining > 0 {
@@ -409,7 +414,12 @@ struct ContentView: View {
         
         syncTimerState(isRunning: false, seconds: 0)
         saveCompletedSession(duration: elapsedSeconds)
-        applyCompletionToActiveTask(elapsedSeconds: elapsedSeconds)
+        
+        if isTaskBoundSession {
+            applyCompletionToActiveTask(elapsedSeconds: elapsedSeconds)
+        }
+        
+        isTaskBoundSession = false
         sessionDuration = nil
         storedSessionDuration = 0
         timerEndDateTimestamp = 0
@@ -425,7 +435,7 @@ struct ContentView: View {
     }
 
     private func resetTimer() {
-        if let elapsed = elapsedSecondsForCurrentSession() {
+        if isTaskBoundSession, let elapsed = elapsedSecondsForCurrentSession() {
             applyCompletionToActiveTask(elapsedSeconds: elapsed)
         }
         timer?.invalidate()
@@ -435,6 +445,7 @@ struct ContentView: View {
         sessionDuration = nil
         storedSessionDuration = 0
         timerEndDateTimestamp = 0
+        isTaskBoundSession = false
         syncTimerState(isRunning: false)
     }
 
@@ -492,7 +503,7 @@ struct ContentView: View {
 
     private func select(_ task: TodoItem) {
         // Apply elapsed time to the previously active task before switching
-        if let elapsed = elapsedSecondsForCurrentSession(), let previous = activeTask {
+        if isTaskBoundSession, let elapsed = elapsedSecondsForCurrentSession(), let previous = activeTask {
             let minutes = minutesFromSeconds(elapsed)
             if minutes > 0 {
                 previous.applyCompletion(minutes: minutes)
@@ -510,6 +521,7 @@ struct ContentView: View {
         storedSessionDuration = 0
         timerEndDateTimestamp = 0
         timeRemaining = timerDuration
+        isTaskBoundSession = false
         syncTimerState(isRunning: false)
 
         // Toggle active flags
@@ -517,6 +529,7 @@ struct ContentView: View {
             item.isActive = (item.id == task.id)
         }
         activeTaskTitle = task.title
+        isTaskBoundSession = task.isActive
         WatchConnectivityManager.shared.sendActiveTask(title: task.title)
         persistTasks()
     }
@@ -525,6 +538,7 @@ struct ContentView: View {
         context.delete(task)
         if task.isActive {
             activeTaskTitle = nil
+            isTaskBoundSession = false
             WatchConnectivityManager.shared.sendActiveTask(title: nil)
         }
         persistTasks()
